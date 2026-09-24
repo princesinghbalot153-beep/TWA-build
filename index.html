@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Mini GTA 3D - Mobile</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #87ceeb; touch-action: none; font-family: Arial, sans-serif; }
+  canvas { display: block; }
+
+  #hud {
+    position: fixed; top: 10px; left: 10px;
+    color: white; font-size: 14px;
+    text-shadow: 1px 1px 3px black;
+    pointer-events: none; z-index: 10;
+  }
+
+  #joystick {
+    position: fixed; bottom: 30px; left: 30px;
+    width: 130px; height: 130px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.4);
+    z-index: 20;
+  }
+  #stick {
+    position: absolute; top: 50%; left: 50%;
+    width: 55px; height: 55px;
+    margin: -27px 0 0 -27px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+  }
+
+  #gas {
+    position: fixed; bottom: 40px; right: 30px;
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    background: rgba(0,255,100,0.35);
+    border: 2px solid rgba(0,255,100,0.7);
+    color: white; font-size: 16px; font-weight: bold;
+    z-index: 20;
+  }
+  #brake {
+    position: fixed; bottom: 140px; right: 50px;
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: rgba(255,50,50,0.35);
+    border: 2px solid rgba(255,50,50,0.7);
+    color: white; font-size: 14px; font-weight: bold;
+    z-index: 20;
+  }
+
+  #msg {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffd700; font-size: 28px; font-weight: bold;
+    text-shadow: 2px 2px 6px black;
+    display: none; z-index: 30;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="objective">🚗 Yellow box tak jao</div>
+  <div id="speed">Speed: 0</div>
+</div>
+
+<div id="joystick"><div id="stick"></div></div>
+<button id="gas">GAS</button>
+<button id="brake">BRAKE</button>
+<div id="msg"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- Scene ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 100, 300);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// ---------- Lights ----------
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(80, 120, 60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -150;
+sun.shadow.camera.right = 150;
+sun.shadow.camera.top = 150;
+sun.shadow.camera.bottom = -150;
+scene.add(sun);
+
+// ---------- Ground ----------
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Roads (simple grid)
+const roadMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+for (let i = -2; i <= 2; i++) {
+  const road1 = new THREE.Mesh(new THREE.PlaneGeometry(500, 12), roadMat);
+  road1.rotation.x = -Math.PI / 2;
+  road1.position.set(0, 0.02, i * 60);
+  scene.add(road1);
+
+  const road2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 500), roadMat);
+  road2.rotation.x = -Math.PI / 2;
+  road2.position.set(i * 60, 0.02, 0);
+  scene.add(road2);
+}
+
+// ---------- Buildings ----------
+const buildings = [];
+const buildingColors = [0x8b6b4a, 0x6b8b8b, 0x9b8b6b, 0x7a7a8b, 0x8b7a6b];
+
+function makeBuilding(x, z, w, d, h) {
+  const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+  const mat = new THREE.MeshLambertMaterial({ color });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.position.set(x, h / 2, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  buildings.push({ x, z, w, d, h });
+}
+
+for (let gx = -2; gx <= 2; gx++) {
+  for (let gz = -2; gz <= 2; gz++) {
+    if (Math.random() < 0.15) continue;
+    const cellX = gx * 60;
+    const cellZ = gz * 60;
+    const offsetX = (Math.random() - 0.5) * 15;
+    const offsetZ = (Math.random() - 0.5) * 15;
+    const w = 20 + Math.random() * 15;
+    const d = 20 + Math.random() * 15;
+    const h = 15 + Math.random() * 45;
+    makeBuilding(cellX + offsetX, cellZ + offsetZ, w, d, h);
+  }
+}
+
+// ---------- Player Car ----------
+const car = new THREE.Group();
+
+const carBody = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 0.8, 4),
+  new THREE.MeshLambertMaterial({ color: 0xff2222 })
+);
+carBody.position.y = 0.7;
+carBody.castShadow = true;
+car.add(carBody);
+
+const cabin = new THREE.Mesh(
+  new THREE.BoxGeometry(1.6, 0.7, 1.8),
+  new THREE.MeshLambertMaterial({ color: 0x111111 })
+);
+cabin.position.set(0, 1.4, -0.2);
+cabin.castShadow = true;
+car.add(cabin);
+
+// Wheels
+const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 12);
+const wheelMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+const wheelPositions = [
+  [-1, 0.4, 1.3], [1, 0.4, 1.3],
+  [-1, 0.4, -1.3], [1, 0.4, -1.3]
+];
+for (const [x, y, z] of wheelPositions) {
+  const w = new THREE.Mesh(wheelGeo, wheelMat);
+  w.rotation.z = Math.PI / 2;
+  w.position.set(x, y, z);
+  w.castShadow = true;
+  car.add(w);
+}
+
+scene.add(car);
+
+// ---------- Objective ----------
+const objective = new THREE.Mesh(
+  new THREE.BoxGeometry(2.5, 2.5, 2.5),
+  new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x554400 })
+);
+objective.position.set(120, 1.5, -120);
+objective.castShadow = true;
+scene.add(objective);
+
+// ---------- Car physics ----------
+let speed = 0;
+const maxSpeed = 0.9;
+const accel = 0.02;
+const friction = 0.97;
+let heading = 0;   // car direction (radians)
+let steerInput = 0;
+let throttle = 0;
+
+function carCollides(x, z, r) {
+  for (const b of buildings) {
+    const dx = Math.max(Math.abs(x - b.x) - b.w / 2, 0);
+    const dz = Math.max(Math.abs(z - b.z) - b.d / 2, 0);
+    if (dx * dx + dz * dz < r * r) return true;
+  }
+  return false;
+}
+
+// ---------- Controls ----------
+const keys = {};
+addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Mobile joystick
+const joystickEl = document.getElementById('joystick');
+const stickEl = document.getElementById('stick');
+let joyActive = false;
+let joyId = null;
+let joyStart = { x: 0, y: 0 };
+let joyVec = { x: 0, y: 0 };
+
+function startJoystick(e) {
+  const touch = e.changedTouches ? e.changedTouches[0] : e;
+  joyActive = true;
+  joyId = touch.identifier ?? 'mouse';
+  const rect = joystickEl.getBoundingClientRect();
+  joyStart.x = rect.left + rect.width / 2;
+  joyStart.y = rect.top + rect.height / 2;
+  moveJoystick(e);
+}
+function moveJoystick(e) {
+  if (!joyActive) return;
+  let touch = e;
+  if (e.changedTouches) {
+    touch = [...e.changedTouches].find(t => t.identifier === joyId) || e.changedTouches[0];
+  }
+  const dx = touch.clientX - joyStart.x;
+  const dy = touch.clientY - joyStart.y;
+  const max = 55;
+  const len = Math.hypot(dx, dy);
+  const clamped = Math.min(len, max);
+  const nx = len ? dx / len : 0;
+  const ny = len ? dy / len : 0;
+  stickEl.style.transform = `translate(${nx * clamped}px, ${ny * clamped}px)`;
+  joyVec.x = (nx * clamped) / max;
+  joyVec.y = (ny * clamped) / max;
+}
+function endJoystick() {
+  joyActive = false;
+  joyId = null;
+  joyVec = { x: 0, y: 0 };
+  stickEl.style.transform = 'translate(0,0)';
+}
+
+joystickEl.addEventListener('touchstart', e => { e.preventDefault(); startJoystick(e); }, { passive: false });
+joystickEl.addEventListener('touchmove', e => { e.preventDefault(); moveJoystick(e); }, { passive: false });
+joystickEl.addEventListener('touchend', e => { e.preventDefault(); endJoystick(); }, { passive: false });
+joystickEl.addEventListener('touchcancel', endJoystick);
+joystickEl.addEventListener('mousedown', startJoystick);
+addEventListener('mousemove', moveJoystick);
+addEventListener('mouseup', endJoystick);
+
+// Gas / brake buttons
+const gasBtn = document.getElementById('gas');
+const brakeBtn = document.getElementById('brake');
+let gasPressed = false, brakePressed = false;
+
+function bindButton(el, onDown, onUp) {
+  el.addEventListener('touchstart', e => { e.preventDefault(); onDown(); }, { passive: false });
+  el.addEventListener('touchend', e => { e.preventDefault(); onUp(); }, { passive: false });
+  el.addEventListener('touchcancel', onUp);
+  el.addEventListener('mousedown', onDown);
+  el.addEventListener('mouseup', onUp);
+  el.addEventListener('mouseleave', onUp);
+}
+bindButton(gasBtn, () => gasPressed = true, () => gasPressed = false);
+bindButton(brakeBtn, () => brakePressed = true, () => brakePressed = false);
+
+// ---------- Resize ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- Game state ----------
+let won = false;
+const msgEl = document.getElementById('msg');
+
+// ---------- Loop ----------
+const clock = new THREE.Clock();
+
+function update() {
+  const dt = Math.min(clock.getDelta(), 0.05) * 60;
+
+  // Input
+  let throttleInput = 0;
+  let steer = 0;
+
+  if (keys['w'] || keys['arrowup'] || gasPressed) throttleInput += 1;
+  if (keys['s'] || keys['arrowdown'] || brakePressed) throttleInput -= 1;
+  if (keys['a'] || keys['arrowleft']) steer += 1;
+  if (keys['d'] || keys['arrowright']) steer -= 1;
+
+  if (Math.abs(joyVec.y) > 0.15) throttleInput += -joyVec.y;
+  if (Math.abs(joyVec.x) > 0.15) steer += -joyVec.x;
+
+  throttleInput = Math.max(-1, Math.min(1, throttleInput));
+  steer = Math.max(-1, Math.min(1, steer));
+
+  // Speed
+  speed += throttleInput * accel * dt;
+  speed *= Math.pow(friction, dt);
+  speed = Math.max(-maxSpeed * 0.5, Math.min(maxSpeed, speed));
+
+  // Steering only when moving
+  const steerStrength = 0.035;
+  heading += steer * steerStrength * dt * (speed / maxSpeed);
+
+  // Position
+  const forwardX = Math.sin(heading);
+  const forwardZ = Math.cos(heading);
+  const nextX = car.position.x + forwardX * speed * dt;
+  const nextZ = car.position.z + forwardZ * speed * dt;
+
+  const carRadius = 2.2;
+  if (!carCollides(nextX, car.position.z, carRadius)) car.position.x = nextX;
+  else speed *= -0.3;
+  if (!carCollides(car.position.x, nextZ, carRadius)) car.position.z = nextZ;
+  else speed *= -0.3;
+
+  car.rotation.y = heading;
+
+  // Objective check
+  const dx = car.position.x - objective.position.x;
+  const dz = car.position.z - objective.position.z;
+  if (!won && Math.hypot(dx, dz) < 4) {
+    won = true;
+    msgEl.style.display = 'block';
+    msgEl.textContent = '✅ MISSION PASSED!';
+  }
+
+  // Camera follow (3rd person)
+  const camOffset = new THREE.Vector3(
+    -forwardX * 12,
+    7,
+    -forwardZ * 12
+  );
+  const targetCamPos = car.position.clone().add(camOffset);
+  camera.position.lerp(targetCamPos, 0.12);
+  camera.lookAt(car.position.x, car.position.y + 2, car.position.z);
+
+  // HUD
+  document.getElementById('speed').textContent =
+    'Speed: ' + Math.round(Math.abs(speed) * 120);
+  if (!won) {
+    document.getElementById('objective').textContent = '🚗 Yellow box tak jao';
+  } else {
+    document.getElementById('objective').textContent = '🏁 Complete!';
+  }
+
+  // Spin objective
+  objective.rotation.y += 0.02 * dt;
+  objective.position.y = 1.5 + Math.sin(performance.now() * 0.003) * 0.4;
+}
+
+function loop() {
+  update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
