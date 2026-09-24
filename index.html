@@ -3,392 +3,308 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Mini GTA 3D - Mobile</title>
+<title>Mini GTA 3D</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #87ceeb; touch-action: none; font-family: Arial, sans-serif; }
-  canvas { display: block; }
-
-  #hud {
-    position: fixed; top: 10px; left: 10px;
-    color: white; font-size: 14px;
-    text-shadow: 1px 1px 3px black;
-    pointer-events: none; z-index: 10;
-  }
-
-  #joystick {
-    position: fixed; bottom: 30px; left: 30px;
-    width: 130px; height: 130px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.15);
-    border: 2px solid rgba(255,255,255,0.4);
-    z-index: 20;
-  }
-  #stick {
-    position: absolute; top: 50%; left: 50%;
-    width: 55px; height: 55px;
-    margin: -27px 0 0 -27px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.55);
-  }
-
-  #gas {
-    position: fixed; bottom: 40px; right: 30px;
-    width: 90px; height: 90px;
-    border-radius: 50%;
-    background: rgba(0,255,100,0.35);
-    border: 2px solid rgba(0,255,100,0.7);
-    color: white; font-size: 16px; font-weight: bold;
-    z-index: 20;
-  }
-  #brake {
-    position: fixed; bottom: 140px; right: 50px;
-    width: 70px; height: 70px;
-    border-radius: 50%;
-    background: rgba(255,50,50,0.35);
-    border: 2px solid rgba(255,50,50,0.7);
-    color: white; font-size: 14px; font-weight: bold;
-    z-index: 20;
-  }
-
-  #msg {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    color: #ffd700; font-size: 28px; font-weight: bold;
-    text-shadow: 2px 2px 6px black;
-    display: none; z-index: 30;
-    text-align: center;
-  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100vw; height:100vh; overflow:hidden; background:#87ceeb; touch-action:none; font-family:Arial,sans-serif; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent; }
+  canvas { display:block; }
+  #hud { position:fixed; top:12px; left:12px; color:#fff; font-size:15px; text-shadow:2px 2px 4px #000; z-index:10; pointer-events:none; }
+  #hud div { margin-bottom:4px; }
+  #joyBase { position:fixed; bottom:30px; left:30px; width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,0.15); border:2px solid rgba(255,255,255,0.5); z-index:20; touch-action:none; }
+  #joyKnob { position:absolute; top:50%; left:50%; width:60px; height:60px; margin:-30px 0 0 -30px; border-radius:50%; background:rgba(255,255,255,0.6); pointer-events:none; }
+  .btn { position:fixed; border-radius:50%; color:#fff; font-weight:bold; z-index:20; touch-action:none; border:2px solid; user-select:none; -webkit-user-select:none; display:flex; align-items:center; justify-content:center; }
+  #gasBtn { bottom:40px; right:30px; width:100px; height:100px; background:rgba(0,200,80,0.5); border-color:#0f8; font-size:18px; }
+  #brakeBtn { bottom:155px; right:45px; width:80px; height:80px; background:rgba(255,60,60,0.5); border-color:#f33; font-size:14px; }
+  #msg { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ffd700; font-size:30px; font-weight:bold; text-shadow:3px 3px 8px #000; display:none; z-index:30; text-align:center; padding:20px 28px; background:rgba(0,0,0,0.65); border-radius:16px; }
 </style>
 </head>
 <body>
-
 <div id="hud">
-  <div id="objective">🚗 Yellow box tak jao</div>
-  <div id="speed">Speed: 0</div>
+  <div id="objText">🚗 Yellow box tak jao</div>
+  <div id="spd">Speed: 0</div>
 </div>
-
-<div id="joystick"><div id="stick"></div></div>
-<button id="gas">GAS</button>
-<button id="brake">BRAKE</button>
+<div id="joyBase"><div id="joyKnob"></div></div>
+<div id="gasBtn" class="btn">GAS</div>
+<div id="brakeBtn" class="btn">BRAKE</div>
 <div id="msg"></div>
 
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
 
-// ---------- Scene ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 100, 300);
+scene.fog = new THREE.Fog(0x87ceeb, 150, 400);
 
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 800);
+camera.position.set(0, 10, -14);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// ---------- Lights ----------
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
-
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(80, 120, 60);
+sun.position.set(60, 120, 60);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -150;
-sun.shadow.camera.right = 150;
-sun.shadow.camera.top = 150;
-sun.shadow.camera.bottom = -150;
+sun.shadow.camera.left = -140;
+sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 140;
+sun.shadow.camera.bottom = -140;
 scene.add(sun);
 
-// ---------- Ground ----------
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(500, 500),
-  new THREE.MeshLambertMaterial({ color: 0x3a3a3a })
+  new THREE.PlaneGeometry(600, 600),
+  new THREE.MeshLambertMaterial({ color: 0x555555 })
 );
-ground.rotation.x = -Math.PI / 2;
+ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Roads (simple grid)
-const roadMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-for (let i = -2; i <= 2; i++) {
-  const road1 = new THREE.Mesh(new THREE.PlaneGeometry(500, 12), roadMat);
-  road1.rotation.x = -Math.PI / 2;
-  road1.position.set(0, 0.02, i * 60);
-  scene.add(road1);
-
-  const road2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 500), roadMat);
-  road2.rotation.x = -Math.PI / 2;
-  road2.position.set(i * 60, 0.02, 0);
-  scene.add(road2);
+// Roads
+const roadMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+for (let i = -4; i <= 4; i++) {
+  const r1 = new THREE.Mesh(new THREE.PlaneGeometry(600, 16), roadMat);
+  r1.rotation.x = -Math.PI/2;
+  r1.position.set(0, 0.02, i*70);
+  r1.receiveShadow = true;
+  scene.add(r1);
+  const r2 = new THREE.Mesh(new THREE.PlaneGeometry(16, 600), roadMat);
+  r2.rotation.x = -Math.PI/2;
+  r2.position.set(i*70, 0.02, 0);
+  r2.receiveShadow = true;
+  scene.add(r2);
 }
 
-// ---------- Buildings ----------
+// Buildings - spawn area kept clear
 const buildings = [];
-const buildingColors = [0x8b6b4a, 0x6b8b8b, 0x9b8b6b, 0x7a7a8b, 0x8b7a6b];
+const colors = [0x9b7a5a, 0x7a8a9a, 0xa89a7a, 0x8a7a8a, 0x7a8a7a, 0xb0a090];
 
-function makeBuilding(x, z, w, d, h) {
-  const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
-  const mat = new THREE.MeshLambertMaterial({ color });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-  mesh.position.set(x, h / 2, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-  buildings.push({ x, z, w, d, h });
-}
-
-for (let gx = -2; gx <= 2; gx++) {
-  for (let gz = -2; gz <= 2; gz++) {
-    if (Math.random() < 0.15) continue;
-    const cellX = gx * 60;
-    const cellZ = gz * 60;
-    const offsetX = (Math.random() - 0.5) * 15;
-    const offsetZ = (Math.random() - 0.5) * 15;
-    const w = 20 + Math.random() * 15;
-    const d = 20 + Math.random() * 15;
-    const h = 15 + Math.random() * 45;
-    makeBuilding(cellX + offsetX, cellZ + offsetZ, w, d, h);
+for (let gx = -3; gx <= 3; gx++) {
+  for (let gz = -3; gz <= 3; gz++) {
+    if (gx === 0 && gz === 0) continue;
+    if (Math.random() < 0.1) continue;
+    const bx = gx*70 + (Math.random()-0.5)*14;
+    const bz = gz*70 + (Math.random()-0.5)*14;
+    // Keep center clear
+    if (Math.hypot(bx, bz) < 45) continue;
+    const bw = 22 + Math.random()*16;
+    const bd = 22 + Math.random()*16;
+    const bh = 18 + Math.random()*40;
+    const c = colors[Math.floor(Math.random()*colors.length)];
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(bw, bh, bd),
+      new THREE.MeshLambertMaterial({ color: c })
+    );
+    m.position.set(bx, bh/2, bz);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+    buildings.push({ x: bx, z: bz, w: bw, d: bd });
   }
 }
 
-// ---------- Player Car ----------
+// Car
 const car = new THREE.Group();
-
-const carBody = new THREE.Mesh(
-  new THREE.BoxGeometry(2, 0.8, 4),
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(2.4, 0.9, 4.8),
   new THREE.MeshLambertMaterial({ color: 0xff2222 })
 );
-carBody.position.y = 0.7;
-carBody.castShadow = true;
-car.add(carBody);
+body.position.y = 0.8;
+body.castShadow = true;
+car.add(body);
 
-const cabin = new THREE.Mesh(
-  new THREE.BoxGeometry(1.6, 0.7, 1.8),
-  new THREE.MeshLambertMaterial({ color: 0x111111 })
+const roof = new THREE.Mesh(
+  new THREE.BoxGeometry(1.9, 0.8, 2.2),
+  new THREE.MeshLambertMaterial({ color: 0x222222 })
 );
-cabin.position.set(0, 1.4, -0.2);
-cabin.castShadow = true;
-car.add(cabin);
+roof.position.set(0, 1.65, -0.3);
+roof.castShadow = true;
+car.add(roof);
 
-// Wheels
-const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 12);
-const wheelMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-const wheelPositions = [
-  [-1, 0.4, 1.3], [1, 0.4, 1.3],
-  [-1, 0.4, -1.3], [1, 0.4, -1.3]
-];
-for (const [x, y, z] of wheelPositions) {
+const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.4, 14);
+const wheelMat = new THREE.MeshLambertMaterial({ color: 0x0a0a0a });
+[[-1.25,0.45,1.5],[1.25,0.45,1.5],[-1.25,0.45,-1.5],[1.25,0.45,-1.5]].forEach(([x,y,z])=>{
   const w = new THREE.Mesh(wheelGeo, wheelMat);
-  w.rotation.z = Math.PI / 2;
+  w.rotation.z = Math.PI/2;
   w.position.set(x, y, z);
   w.castShadow = true;
   car.add(w);
-}
-
+});
+car.position.set(0, 0, 0);
 scene.add(car);
 
-// ---------- Objective ----------
+// Objective
 const objective = new THREE.Mesh(
-  new THREE.BoxGeometry(2.5, 2.5, 2.5),
-  new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x554400 })
+  new THREE.BoxGeometry(3, 3, 3),
+  new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x886600 })
 );
-objective.position.set(120, 1.5, -120);
+objective.position.set(80, 2, -80);
 objective.castShadow = true;
 scene.add(objective);
 
-// ---------- Car physics ----------
+// Physics
 let speed = 0;
-const maxSpeed = 0.9;
-const accel = 0.02;
-const friction = 0.97;
-let heading = 0;   // car direction (radians)
-let steerInput = 0;
-let throttle = 0;
+const MAX_SPEED = 1.3;
+const ACCEL = 0.045;
+const FRICTION = 0.96;
+let heading = 0;
+let won = false;
 
-function carCollides(x, z, r) {
+function collide(x, z, r) {
   for (const b of buildings) {
-    const dx = Math.max(Math.abs(x - b.x) - b.w / 2, 0);
-    const dz = Math.max(Math.abs(z - b.z) - b.d / 2, 0);
-    if (dx * dx + dz * dz < r * r) return true;
+    const dx = Math.max(Math.abs(x-b.x) - b.w/2, 0);
+    const dz = Math.max(Math.abs(z-b.z) - b.d/2, 0);
+    if (dx*dx + dz*dz < r*r) return true;
   }
   return false;
 }
 
-// ---------- Controls ----------
+// Inputs
 const keys = {};
+const state = { gasTouch:false, brakeTouch:false };
+
 addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-// Mobile joystick
-const joystickEl = document.getElementById('joystick');
-const stickEl = document.getElementById('stick');
-let joyActive = false;
-let joyId = null;
-let joyStart = { x: 0, y: 0 };
-let joyVec = { x: 0, y: 0 };
+// Joystick (pointer events - works on mobile + desktop)
+const joyBase = document.getElementById('joyBase');
+const joyKnob = document.getElementById('joyKnob');
+let joyId = null, joyCx = 0, joyCy = 0;
+let joyVec = { x:0, y:0 };
 
-function startJoystick(e) {
-  const touch = e.changedTouches ? e.changedTouches[0] : e;
-  joyActive = true;
-  joyId = touch.identifier ?? 'mouse';
-  const rect = joystickEl.getBoundingClientRect();
-  joyStart.x = rect.left + rect.width / 2;
-  joyStart.y = rect.top + rect.height / 2;
-  moveJoystick(e);
+function joyStart(e) {
+  joyId = e.pointerId;
+  try { joyBase.setPointerCapture(e.pointerId); } catch(_) {}
+  const r = joyBase.getBoundingClientRect();
+  joyCx = r.left + r.width/2;
+  joyCy = r.top + r.height/2;
+  joyMove(e);
 }
-function moveJoystick(e) {
-  if (!joyActive) return;
-  let touch = e;
-  if (e.changedTouches) {
-    touch = [...e.changedTouches].find(t => t.identifier === joyId) || e.changedTouches[0];
-  }
-  const dx = touch.clientX - joyStart.x;
-  const dy = touch.clientY - joyStart.y;
-  const max = 55;
+function joyMove(e) {
+  if (e.pointerId !== joyId) return;
+  const dx = e.clientX - joyCx;
+  const dy = e.clientY - joyCy;
+  const maxR = 55;
   const len = Math.hypot(dx, dy);
-  const clamped = Math.min(len, max);
-  const nx = len ? dx / len : 0;
-  const ny = len ? dy / len : 0;
-  stickEl.style.transform = `translate(${nx * clamped}px, ${ny * clamped}px)`;
-  joyVec.x = (nx * clamped) / max;
-  joyVec.y = (ny * clamped) / max;
+  const cl = Math.min(len, maxR);
+  const nx = len ? dx/len : 0;
+  const ny = len ? dy/len : 0;
+  joyKnob.style.transform = `translate(${nx*cl}px, ${ny*cl}px)`;
+  joyVec.x = (nx*cl)/maxR;
+  joyVec.y = (ny*cl)/maxR;
 }
-function endJoystick() {
-  joyActive = false;
+function joyEnd(e) {
+  if (e && e.pointerId !== joyId) return;
   joyId = null;
-  joyVec = { x: 0, y: 0 };
-  stickEl.style.transform = 'translate(0,0)';
+  joyVec = { x:0, y:0 };
+  joyKnob.style.transform = 'translate(0,0)';
 }
 
-joystickEl.addEventListener('touchstart', e => { e.preventDefault(); startJoystick(e); }, { passive: false });
-joystickEl.addEventListener('touchmove', e => { e.preventDefault(); moveJoystick(e); }, { passive: false });
-joystickEl.addEventListener('touchend', e => { e.preventDefault(); endJoystick(); }, { passive: false });
-joystickEl.addEventListener('touchcancel', endJoystick);
-joystickEl.addEventListener('mousedown', startJoystick);
-addEventListener('mousemove', moveJoystick);
-addEventListener('mouseup', endJoystick);
+joyBase.addEventListener('pointerdown', e => { e.preventDefault(); joyStart(e); });
+joyBase.addEventListener('pointermove', joyMove);
+joyBase.addEventListener('pointerup', joyEnd);
+joyBase.addEventListener('pointercancel', joyEnd);
 
-// Gas / brake buttons
-const gasBtn = document.getElementById('gas');
-const brakeBtn = document.getElementById('brake');
-let gasPressed = false, brakePressed = false;
+// Gas / brake
+const gasBtn = document.getElementById('gasBtn');
+const brakeBtn = document.getElementById('brakeBtn');
 
-function bindButton(el, onDown, onUp) {
-  el.addEventListener('touchstart', e => { e.preventDefault(); onDown(); }, { passive: false });
-  el.addEventListener('touchend', e => { e.preventDefault(); onUp(); }, { passive: false });
-  el.addEventListener('touchcancel', onUp);
-  el.addEventListener('mousedown', onDown);
-  el.addEventListener('mouseup', onUp);
-  el.addEventListener('mouseleave', onUp);
+function bindHold(el, onDown, onUp) {
+  let activeId = null;
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    activeId = e.pointerId;
+    try { el.setPointerCapture(e.pointerId); } catch(_) {}
+    onDown();
+  });
+  el.addEventListener('pointerup', e => { if (e.pointerId === activeId) { onUp(); activeId = null; } });
+  el.addEventListener('pointercancel', () => { onUp(); activeId = null; });
 }
-bindButton(gasBtn, () => gasPressed = true, () => gasPressed = false);
-bindButton(brakeBtn, () => brakePressed = true, () => brakePressed = false);
+bindHold(gasBtn, () => state.gasTouch = true, () => state.gasTouch = false);
+bindHold(brakeBtn, () => state.brakeTouch = true, () => state.brakeTouch = false);
 
-// ---------- Resize ----------
 addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ---------- Game state ----------
-let won = false;
-const msgEl = document.getElementById('msg');
-
-// ---------- Loop ----------
+// Loop
 const clock = new THREE.Clock();
+const msgEl = document.getElementById('msg');
+const spdEl = document.getElementById('spd');
+const objEl = document.getElementById('objText');
 
-function update() {
+function tick() {
   const dt = Math.min(clock.getDelta(), 0.05) * 60;
 
-  // Input
-  let throttleInput = 0;
+  let throttle = 0;
   let steer = 0;
 
-  if (keys['w'] || keys['arrowup'] || gasPressed) throttleInput += 1;
-  if (keys['s'] || keys['arrowdown'] || brakePressed) throttleInput -= 1;
+  if (keys['w'] || keys['arrowup'] || state.gasTouch) throttle += 1;
+  if (keys['s'] || keys['arrowdown'] || state.brakeTouch) throttle -= 1;
   if (keys['a'] || keys['arrowleft']) steer += 1;
   if (keys['d'] || keys['arrowright']) steer -= 1;
 
-  if (Math.abs(joyVec.y) > 0.15) throttleInput += -joyVec.y;
+  if (Math.abs(joyVec.y) > 0.15) throttle += -joyVec.y;
   if (Math.abs(joyVec.x) > 0.15) steer += -joyVec.x;
 
-  throttleInput = Math.max(-1, Math.min(1, throttleInput));
+  throttle = Math.max(-1, Math.min(1, throttle));
   steer = Math.max(-1, Math.min(1, steer));
 
-  // Speed
-  speed += throttleInput * accel * dt;
-  speed *= Math.pow(friction, dt);
-  speed = Math.max(-maxSpeed * 0.5, Math.min(maxSpeed, speed));
+  speed += throttle * ACCEL * dt;
+  speed *= Math.pow(FRICTION, dt);
+  speed = Math.max(-MAX_SPEED*0.5, Math.min(MAX_SPEED, speed));
 
-  // Steering only when moving
-  const steerStrength = 0.035;
-  heading += steer * steerStrength * dt * (speed / maxSpeed);
+  if (Math.abs(speed) > 0.02) {
+    heading += steer * 0.05 * dt * (speed / MAX_SPEED);
+  }
 
-  // Position
-  const forwardX = Math.sin(heading);
-  const forwardZ = Math.cos(heading);
-  const nextX = car.position.x + forwardX * speed * dt;
-  const nextZ = car.position.z + forwardZ * speed * dt;
+  const fx = Math.sin(heading);
+  const fz = Math.cos(heading);
+  const nx = car.position.x + fx * speed * dt;
+  const nz = car.position.z + fz * speed * dt;
+  const r = 2.6;
 
-  const carRadius = 2.2;
-  if (!carCollides(nextX, car.position.z, carRadius)) car.position.x = nextX;
-  else speed *= -0.3;
-  if (!carCollides(car.position.x, nextZ, carRadius)) car.position.z = nextZ;
-  else speed *= -0.3;
+  if (!collide(nx, car.position.z, r)) car.position.x = nx; else speed *= -0.15;
+  if (!collide(car.position.x, nz, r)) car.position.z = nz; else speed *= -0.15;
 
   car.rotation.y = heading;
 
-  // Objective check
-  const dx = car.position.x - objective.position.x;
-  const dz = car.position.z - objective.position.z;
-  if (!won && Math.hypot(dx, dz) < 4) {
+  // Camera
+  const camTX = car.position.x - fx * 13;
+  const camTZ = car.position.z - fz * 13;
+  camera.position.x += (camTX - camera.position.x) * 0.15;
+  camera.position.z += (camTZ - camera.position.z) * 0.15;
+  camera.position.y += (9 - camera.position.y) * 0.15;
+  camera.lookAt(car.position.x + fx*3, 1.2, car.position.z + fz*3);
+
+  // Objective
+  const dxo = car.position.x - objective.position.x;
+  const dzo = car.position.z - objective.position.z;
+  if (!won && Math.hypot(dxo, dzo) < 4.5) {
     won = true;
-    msgEl.style.display = 'block';
     msgEl.textContent = '✅ MISSION PASSED!';
+    msgEl.style.display = 'block';
   }
+  objective.rotation.y += 0.025 * dt;
+  objective.position.y = 2 + Math.sin(performance.now()*0.003) * 0.5;
 
-  // Camera follow (3rd person)
-  const camOffset = new THREE.Vector3(
-    -forwardX * 12,
-    7,
-    -forwardZ * 12
-  );
-  const targetCamPos = car.position.clone().add(camOffset);
-  camera.position.lerp(targetCamPos, 0.12);
-  camera.lookAt(car.position.x, car.position.y + 2, car.position.z);
+  spdEl.textContent = 'Speed: ' + Math.round(Math.abs(speed)*100);
+  objEl.textContent = won ? '🏁 Complete!' : '🚗 Yellow box tak jao';
 
-  // HUD
-  document.getElementById('speed').textContent =
-    'Speed: ' + Math.round(Math.abs(speed) * 120);
-  if (!won) {
-    document.getElementById('objective').textContent = '🚗 Yellow box tak jao';
-  } else {
-    document.getElementById('objective').textContent = '🏁 Complete!';
-  }
-
-  // Spin objective
-  objective.rotation.y += 0.02 * dt;
-  objective.position.y = 1.5 + Math.sin(performance.now() * 0.003) * 0.4;
-}
-
-function loop() {
-  update();
   renderer.render(scene, camera);
-  requestAnimationFrame(loop);
+  requestAnimationFrame(tick);
 }
-loop();
+tick();
 </script>
 </body>
 </html>
